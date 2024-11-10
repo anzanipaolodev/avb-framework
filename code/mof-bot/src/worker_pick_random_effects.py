@@ -51,7 +51,8 @@ def pick_effects():
     emotion = np.random.choice(emotions)
     tone = np.random.choice(tones)
     length = int(np.clip(np.random.normal(40, 40), 10, 220))
-    lore = np.random.choice([True, False], p=[0.05, 0.95])
+    #lore = np.random.choice([True, False], p=[0.05, 0.95])
+    lore = False
     scramble = np.random.choice([True, False], p=[0.1, 0.9])
     mistakes = np.random.choice([True, False], p=[2/3, 1/3])
     thirdperson = np.random.choice([True, False], p=[0.01, 0.99])

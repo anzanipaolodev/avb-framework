@@ -1,9 +1,7 @@
 import os
 import numpy as np
 import re
-
-#from repair_vulgarity import ObscenityRepairer
-
+import replicate
 from openai import OpenAI
 
 from typing import List, Dict
@@ -12,7 +10,9 @@ from dotenv import load_dotenv
 LLM_MODEL_VERSION_MIN = "gpt-4o"
 
 load_dotenv()
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+LLM_PROVIDER = os.getenv("LLM_PROVIDER").lower()  # Default to OpenAI if not specified
+if LLM_PROVIDER == "openai":
+    openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 def scramble_word_innards(text):
     def scramble_word(word):
@@ -28,38 +28,87 @@ def scramble_word_innards(text):
 
 def validate_api():
     """
-    Validates the availability and correctness of OpenAI API and environment variables.
+    Validates the availability and correctness of API and environment variables.
 
     Raises:
-    - ValueError: If the API key or LLM model version is incorrect or missing, or if there's an issue connecting to OpenAI.
+    - ValueError: If the API keys or model configurations are incorrect or missing
     """
+    if LLM_PROVIDER == "openai":
+        if not os.getenv("OPENAI_API_KEY"):
+            raise ValueError("Required environment variable OPENAI_API_KEY is missing or empty.")
 
-    if not os.getenv("OPENAI_API_KEY"):
-        raise ValueError(
-            "Required environment variable OPENAI_API_KEY is missing or empty."
+        if os.getenv("LLM_MODEL") and not os.getenv("LLM_MODEL", "").startswith(LLM_MODEL_VERSION_MIN):
+            raise ValueError("LLM_MODEL requires 'gpt-4o' as a minimum. Please check your environment.")
+
+        llm_model = os.getenv("LLM_MODEL")
+        try:
+            available_models = [model.id for model in openai_client.models.list().data]
+            if llm_model and llm_model not in available_models:
+                raise ValueError(f"The model {llm_model} is not available or you don't have access to it.")
+        except Exception as e:
+            raise ValueError(f"Failed to fetch the list of models from OpenAI: {str(e)}")
+        
+        print("OpenAI API access confirmed.")
+
+    elif LLM_PROVIDER == "replicate":
+        if not os.getenv("REPLICATE_API_TOKEN"):
+            raise ValueError("Required environment variable REPLICATE_API_TOKEN is missing or empty.")
+        
+        # Test Replicate API connection
+        try:
+            replicate.Client(api_token=os.getenv("REPLICATE_API_TOKEN"))
+            print("Replicate API access confirmed.")
+        except Exception as e:
+            raise ValueError(f"Failed to connect to Replicate API: {str(e)}")
+    
+    else:
+        raise ValueError(f"Unsupported LLM provider: {LLM_PROVIDER}")
+
+def get_llm_response(prompt: str) -> str:
+    """
+    Get response from the selected LLM provider
+    """
+    if LLM_PROVIDER == "openai":
+        llm_model = os.getenv("LLM_MODEL")
+        completion = openai_client.chat.completions.create(
+            model=llm_model,
+            temperature=1,
+            top_p=1,
+            frequency_penalty=0,
+            presence_penalty=0,
+            messages=[
+                {
+                    "role": "system",
+                    "content": "The following is a conversation with an AI assistant tasked with crafting tweets according to various requested levels of humor, vulgarity, and shock,"
+                },
+                {"role": "user", "content": prompt},
+            ]
         )
+        return completion.choices[0].message.content
 
-    if os.getenv("LLM_MODEL") and not os.getenv("LLM_MODEL", "").startswith(LLM_MODEL_VERSION_MIN):
-        raise ValueError(
-            "LLM_MODEL requires 'gpt-4o as a minimum. Please check your environment."
+    elif LLM_PROVIDER == "replicate":
+        model_version = os.getenv("REPLICATE_MODEL_VERSION")
+        output = replicate.run(
+            model_version,
+            input={
+                "system_prompt": "The following is a conversation with an AI assistant tasked with crafting tweets according to various requested levels of humor, vulgarity, and shock. You just write tweets, nothing else.",
+                "prompt": prompt,
+                "stop_sequences": "<|end_of_text|>,<|eot_id|>",
+                "prompt_template": """
+                <|begin_of_text|><|start_header_id|>system<|end_header_id|>
+
+                {system_prompt}<|eot_id|><|start_header_id|>user<|end_header_id|>
+
+                {prompt}<|eot_id|><|start_header_id|>assistant<|end_header_id|>
+                """,
+                "max_tokens": 500,
+                "temperature": 0.9,
+                "top_p": 1,
+            }
         )
-
-
-    llm_model = os.getenv("LLM_MODEL")
-
-    # Fetch models and store information about the one we're using
-    try:
-        available_models = [model.id for model in client.models.list().data]
-        if llm_model and llm_model not in available_models:
-            raise ValueError(
-                f"The model {llm_model} is not available or you don't have access to it."
-            )
-    except openai.OpenAIError as e:
-        raise ValueError(
-            f"Failed to fetch the list of models from OpenAI: {str(e)}"
-        )
-
-    print("OpenAI API access confirmed.")
+        
+        # Replicate returns an iterator, we need to join the chunks
+        return ''.join([chunk for chunk in output])
 
 def replace_words(text):
     return re.sub(
@@ -77,7 +126,7 @@ def replace_words(text):
     )
 
 def try_mixture(posts, post_prev, lore, effects, log_event):
-    validate_api()
+    validate_api() 
 
     author_0 = ""
     author_1 = ""
@@ -173,29 +222,9 @@ OBJECTIVES:
     print(f"PROMPT: {prompt}")
     log_event(f"PROMPT: {prompt}")
 
-    llm_model = os.getenv("LLM_MODEL")
-    content = prompt
-
-    completion = client.chat.completions.create(model=llm_model,
-    temperature=1,
-    top_p=1,
-    frequency_penalty=0,
-    presence_penalty=0,
-    messages=[
-        {
-            "role": "system",
-            "content": "The following is a conversation with an AI assistant tasked with crafting tweets according to various requested levels of humor, vulgarity, and shock,"
-        },
-        {"role": "user", "content": content},
-    ])
-
-    response = completion.choices[0].message.content
+    response = get_llm_response(prompt)
     
     # Elon doesn't like being tagged by peons
-    response = re.sub(r"@elonmusk", "elonmusk", response, flags=re.IGNORECASE);
-    
-    # Fix the LLMs attempts to sanitize
-    #repairer = ObscenityRepairer(severity='worst')
-    #response = repairer.repair_text(response)
+    response = re.sub(r"@elonmusk", "elonmusk", response, flags=re.IGNORECASE)
 
     return response

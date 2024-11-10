@@ -21,7 +21,7 @@ from cores.avbcore_exceptions import AVBCoreHeartbeatError, AVBCoreRegistryFileE
 from worker_pick_lore import pick_lore
 from worker_pick_foolish_content import pick_n_posts
 from worker_pick_random_effects import pick_effects
-from worker_mixture_of_fools_llm import try_mixture
+from worker_mixture_of_fools_llm import try_mixture, LLM_PROVIDER
 from worker_send_tweet import send_tweet
 
 from dotenv import load_dotenv
@@ -181,7 +181,8 @@ def prepare_tweet_for_scheduling():
 
 def create_tweet_content(post_prev):
     try:
-        lore = pick_lore()
+        #lore = pick_lore()
+        lore = None
         posts = pick_n_posts(3, fools_content)
         effects = pick_effects()
         tweet = try_mixture(posts, post_prev, lore, effects, log_event)
@@ -213,9 +214,29 @@ def tick():
             time_sleep = max(0, TICK - time_elapsed) / 1000
             time.sleep(time_sleep)
 
+def log_llm_configuration():
+    """Log the current LLM configuration"""
+    provider = os.getenv("LLM_PROVIDER", "openai").lower()
+    
+    if provider == "openai":
+        model = os.getenv("LLM_MODEL", "unknown")
+        log_event(f"LLM Configuration - Provider: OpenAI, Model: {model}")
+        print(f"LLM Configuration - Provider: OpenAI, Model: {model}")
+    elif provider == "replicate":
+        model = os.getenv("REPLICATE_MODEL_VERSION", "unknown")
+        log_event(f"LLM Configuration - Provider: Replicate, Model: {model}")
+        print(f"LLM Configuration - Provider: Replicate, Model: {model}")
+    else:
+        log_event(f"LLM Configuration - Unknown provider: {provider}")
+        print(f"LLM Configuration - Unknown provider: {provider}")
+
 if __name__ == "__main__":
     log_event("Starting agent...")
     print("Starting agent...")
+    
+    # Log LLM configuration at startup
+    log_llm_configuration()
+    
     tick()
     log_event("Agent stopped.")
     print("Agent stopped.")
