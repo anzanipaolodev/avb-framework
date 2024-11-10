@@ -15,6 +15,8 @@ import splash
 import result
 import fools_content
 
+from dbh import DBH
+
 from cores.avbcore_manager import AVBCoreManager
 from cores.avbcore_exceptions import AVBCoreHeartbeatError, AVBCoreRegistryFileError, AVBCoreLoadingError
 
@@ -46,10 +48,14 @@ def log_event(message):
     print(f"[LOG] {message}")  # Print to console for immediate feedback
 
 # Splash display
-splash.display()
+splash.display("Westworld (v0.0.2)")
 
 # Load content
 fools_content.load_available_content()
+
+# Set database handler
+dbh = DBH.get_instance()
+db_conn = dbh.get_connection()
 
 # Initialize CoreManager
 cores = AVBCoreManager()
@@ -138,7 +144,7 @@ def execute(time_start, job_queue, results_queue):
                 log_event("Generating content for scheduled tweet.")
                 print("Generating content for scheduled tweet.")
                 event.content = create_tweet_content(previous_post)
-
+                
             # Check if the timestamp has been reached and send the tweet if content is ready
             if event.event_time <= now and event.content:
                 try:
@@ -165,7 +171,8 @@ def execute(time_start, job_queue, results_queue):
 
     # If no active events, schedule a new one
     if not any(event for event in scheduler_list if not event.completed):
-        prepare_tweet_for_scheduling()
+        # DEBUGGING, DISABLED prepare_tweet_for_scheduling()
+        pass
 
 def prepare_tweet_for_scheduling():
     delay_minutes = int(np.random.normal(loc=25, scale=10))
