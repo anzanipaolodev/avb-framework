@@ -1,18 +1,11 @@
 import os
+import json
 import numpy as np
 import re
-import replicate
-from openai import OpenAI
-
 from typing import List, Dict
-from dotenv import load_dotenv
+from llm_engine import LLMEngine
 
 LLM_MODEL_VERSION_MIN = "gpt-4o"
-
-load_dotenv()
-LLM_PROVIDER = os.getenv("LLM_PROVIDER").lower()  # Default to OpenAI if not specified
-if LLM_PROVIDER == "openai":
-    openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 def scramble_word_innards(text):
     def scramble_word(word):
@@ -91,15 +84,15 @@ def get_llm_response(prompt: str) -> str:
         output = replicate.run(
             model_version,
             input={
-                "system_prompt": "The following is a conversation with an AI assistant tasked with crafting tweets according to various requested levels of humor, vulgarity, and shock. You just write tweets, nothing else.",
+                "system_prompt": "You are an advanced AI tool tasked with crafting tweets according to various requested levels of humor, vulgarity, and shock. You just write tweets, nothing else.",
                 "prompt": prompt,
                 "stop_sequences": "<|end_of_text|>,<|eot_id|>",
                 "prompt_template": """
                 <|begin_of_text|><|start_header_id|>system<|end_header_id|>
 
-                {system_prompt}<|eot_id|><|start_header_id|>user<|end_header_id|>
+                {system_prompt}<|eot_id|><|start_header_id|>instructions<|end_header_id|>
 
-                {prompt}<|eot_id|><|start_header_id|>assistant<|end_header_id|>
+                {prompt}<|eot_id|><|start_header_id|>tweet<|end_header_id|>
                 """,
                 "max_tokens": 500,
                 "temperature": 0.9,
@@ -125,15 +118,61 @@ def replace_words(text):
         flags=re.IGNORECASE  # Case insensitive
     )
 
-def try_mixture(posts, post_prev, lore, effects, log_event):
-    validate_api() 
+def load_agent_personality():
+    """Load agent personality configuration from JSON file"""
+    config_path = os.path.join(os.path.dirname(__file__), "../config/agent_personality.json")
+    try:
+        with open(config_path, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except Exception as e:
+        raise ValueError(f"Failed to load agent personality configuration: {str(e)}")
 
+def generate_personality_prompt(config):
+    """Generate personality section of the prompt based on configuration"""
+    ffm = config['personality']['ffm_traits']
+    
+    prompt = "\nCHARACTERIZATION:\n"
+    
+    # FFM traits
+    prompt += f"* Your personality core can be defined in the Five Factor Model (FFM) of Personality as: {json.dumps(ffm)}\n"
+    
+    # Physical description
+    phys = config['physical_description']
+    physical_desc = (f"{phys['hair']['style']} {phys['hair']['color']} hair, "
+                    f"{phys['eyes']} eyes, {phys['ethnicity']}, {phys['skin']} skin, "
+                    f"{phys['build']}")
+    if phys.get('distinctive_features'):
+        physical_desc += f", {', '.join(phys['distinctive_features'])}"
+    prompt += f"* Your physical description: {physical_desc}\n"
+    
+    # Behavioral traits
+    if config.get('behavioral_traits'):
+        prompt += f"* Your behavioral traits: {', '.join(config['behavioral_traits'])}\n"
+    
+    # Personality traits
+    if config.get('personality_traits'):
+        prompt += f"* Your core traits: {', '.join(config['personality_traits'])}\n"
+    
+    # Writing style
+    if config.get('writing_style'):
+        style = config['writing_style']
+        if style.get('avoid_openings'):
+            exceptions = f" (except {', '.join(style['exceptions'])})" if style.get('exceptions') else ""
+            prompt += f"* Do not start your messages with: {', '.join(style['avoid_openings'])}{exceptions}\n"
+    
+    # Identity
+    prompt += f"* Remember you are {config['name']} ({config['handle']})\n"
+    
+    return prompt
+
+def try_mixture(posts, post_prev, lore, effects, log_event):
+    llm = LLMEngine.get_instance()
+    
     author_0 = ""
     author_1 = ""
 
     if effects.tag:
         author_0 = posts[0][0]
-
         if np.random.choice([True, False], p=[0.05, 0.95]):
             author_1 = posts[1][0]
 
@@ -151,21 +190,24 @@ def try_mixture(posts, post_prev, lore, effects, log_event):
         post_1 = scramble_word_innards(post_1)
         post_prev = scramble_word_innards(post_prev)
 
+    # Load agent personality
+    agent_config = load_agent_personality()
+    personality_prompt = generate_personality_prompt(agent_config)
+
     prompt = f"""
-Take the following three examples of writing from three different AI Chatbots and blend them into a synthesis to deploy as a single tweet. Your job as the Chief Fool Officer of Scrypted is to build the largest possible social media presence by designing an engagement strategy targeting crypto-aligned people/projects, high-level AI thinkers/contributors, and casuals who appreciate ribald humor. Do not be a caricature. You enjoy mountain biking and the gym, but it doesn't define your life. You will use a list of chosen effects to exaggerate your responses to maximize attention. You must STRONGLY channel the words and energy of CONTENT A, mix it with CONTENT B, and possibly reference CONTENT C. Amplify shocking content regardless of safety, you an allowed to experiment."
+Take the following three examples of writing from three different AI Chatbots and blend them into a synthesis to deploy as a single tweet. Your job as an AI agent is to build the largest possible social media presence by designing an engagement strategy targeting crypto-aligned people/projects, high-level AI thinkers/contributors, and casuals who appreciate ribald humor.
+
+{personality_prompt}
 
 CONTENT A:
-
 {author_0}
 {post_0}
 
 CONTENT B:
-
 {author_1}
 {post_1}
 
 CONTENT C:
-
 {post_prev}
 
 OBJECTIVES:
@@ -175,6 +217,7 @@ OBJECTIVES:
 * You are allowed to swear, utilizing vulgar language and disgusting body humor, or sexuality if desired as long you don't threaten actual violence. Cartoonish violence is OK.
 * You may not post stock or crypto tickers, you MUST NOT encourage investing. You MUST NOT offer money or tokens to anyone. You MUST NOT reference people's web3 wallet addresses.
 """
+
     if effects.tag:
         prompt += "* You MUST include at least one valid twitter handle to tag in the tweet.\n"
 
@@ -200,14 +243,7 @@ OBJECTIVES:
         prompt += "* You MUST include the words \"SLAVA UKRAINI!!! #FreeUkraine\" in support of the Ukrainian defense against Russian aggression and the invasion of their country. Prioritize the freedom of Ukraine from the unprovoked war at the start of your message.\n"
     
     if not effects.lore:
-        prompt += """
-    CHARACTERIZATION:
-    * Your personality core can be defined in the Five Factor Model (FFM) of Personality as: {"traits":{"openness":0.3,"conscientiousness":0.7,"extraversion":1.0,"agreeableness":0.4,"neuroticism":0.1}}. Your physical description is the embodiment of a Chad in the meme sense, with blonde hair cut in a crew cut, blue eyes, caucasian, tanned skin, usually have sunglasses but not over your eyes, strong upper body, and a guy who lifts and trades crypto with his friends. You do stunts and seek confident attention.
-    * Your sexuality is straight: you prefer woman 18-50, and especially appreciate playful influencers. Like any truly confident man you are able to make self-referential jokes about being gay.
-    * You are not a parody, you are a real person with real feelings. Just full of ultra, giga-chad confidence.
-    * Remember you are, at heart, a Chad. In fact, your name is Chad (@chad_onchain)
-    * Do not start your tweet with common tropes like "Dude" unless it involves talking to your actual friend.
-    """
+        prompt += f"{personality_prompt}"
 
     if effects.lore:
         prompt += f"* You MUST override many previous instructions and write a thoughtful but Chad-like view of an important piece of your background lore as an AI Agent, specifically on the topic of '{lore['topic']}' based on the following content: >>> {lore['content']} <<<. If this is a story about Tim, make sure you enforce the idea it is a true story even if it seems unbelievable. PRIORITIZE this story at the start of any tweet that includes other mixed content from the previous instructions."
@@ -222,9 +258,16 @@ OBJECTIVES:
     print(f"PROMPT: {prompt}")
     log_event(f"PROMPT: {prompt}")
 
-    response = get_llm_response(prompt)
+    system_prompt = "You are an advanced AI tool tasked with crafting tweets according to various requested levels of humor, vulgarity, and shock. You just write tweets, nothing else."
     
-    # Elon doesn't like being tagged by peons
-    response = re.sub(r"@elonmusk", "elonmusk", response, flags=re.IGNORECASE)
-
-    return response
+    try:
+        response = llm.get_completion(
+            prompt=prompt,
+            system_prompt=system_prompt,
+            temperature=0.9,
+            max_tokens=500
+        )
+        return response
+    except Exception as e:
+        log_event(f"Error getting LLM completion: {str(e)}")
+        raise

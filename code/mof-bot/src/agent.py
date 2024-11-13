@@ -23,10 +23,12 @@ from cores.avbcore_exceptions import AVBCoreHeartbeatError, AVBCoreRegistryFileE
 from worker_pick_lore import pick_lore
 from worker_pick_foolish_content import pick_n_posts
 from worker_pick_random_effects import pick_effects
-from worker_mixture_of_fools_llm import try_mixture, LLM_PROVIDER
+from worker_mixture_of_fools_llm import try_mixture
 from worker_send_tweet import send_tweet
 
 from dotenv import load_dotenv
+
+from llm_engine import LLMEngine
 
 load_dotenv()
 DEBUGGING=os.getenv("DEBUGGING")
@@ -48,7 +50,7 @@ def log_event(message):
     print(f"[LOG] {message}")  # Print to console for immediate feedback
 
 # Splash display
-splash.display("Westworld (v0.0.2)")
+splash.display("Neo (v0.0.3)")
 
 # Load content
 fools_content.load_available_content()
@@ -106,7 +108,7 @@ def signal_handler(sig, frame):
     
     # Log the shutdown
     log_event("Interrupt received, shutting down gracefully...")
-    print("\nInterrupt received, shutting down gracefully...")
+    #print("\nInterrupt received, shutting down gracefully...")
 
 signal.signal(signal.SIGINT, signal_handler)
 
@@ -142,7 +144,7 @@ def execute(time_start, job_queue, results_queue):
             # Immediately create content if it's not already created
             if not event.content:
                 log_event("Generating content for scheduled tweet.")
-                print("Generating content for scheduled tweet.")
+                #print("Generating content for scheduled tweet.")
                 event.content = create_tweet_content(previous_post)
                 
             # Check if the timestamp has been reached and send the tweet if content is ready
@@ -152,27 +154,26 @@ def execute(time_start, job_queue, results_queue):
                         send_tweet(event.content, log_event)
                         
                     log_event(f"Tweet sent successfully: {event.content}")
-                    print(f"Tweet sent successfully at {now}.")
+                    #print(f"Tweet sent successfully at {now}.")
                     event.completed = True
                     event.backoff_time = 0  # Reset backoff after successful send
                     previous_post = event.content
                 except tweepy.errors.TooManyRequests as e:
                     log_event(f"Rate limit error while sending tweet: {e}")
-                    print(f"Rate limit error while sending tweet: {e}")
+                    #print(f"Rate limit error while sending tweet: {e}")
                     event.apply_backoff()
                 except tweepy.errors.TweepyException as e:
                     log_event(f"Error while sending tweet: {e}")
-                    print(f"Error while sending tweet: {e}")
+                    #print(f"Error while sending tweet: {e}")
                     event.apply_backoff()
                 except Exception as e:
                     log_event(f"Unexpected error while sending tweet: {e}")
-                    print(f"Unexpected error while sending tweet: {e}")
+                    #print(f"Unexpected error while sending tweet: {e}")
                     event.apply_backoff()
 
     # If no active events, schedule a new one
     if not any(event for event in scheduler_list if not event.completed):
-        # DEBUGGING, DISABLED prepare_tweet_for_scheduling()
-        pass
+        prepare_tweet_for_scheduling()
 
 def prepare_tweet_for_scheduling():
     delay_minutes = int(np.random.normal(loc=25, scale=10))
@@ -183,22 +184,22 @@ def prepare_tweet_for_scheduling():
 
     event_time = datetime.now() + timedelta(minutes=delay_minutes)
     log_event(f"Scheduled a new tweet event at {event_time}.")
-    print(f"Scheduled a new tweet event at {event_time}.")
+    #print(f"Scheduled a new tweet event at {event_time}.")
     scheduler_list.append(ScheduledEvent(event_time, "Scheduled tweet post"))
 
 def create_tweet_content(post_prev):
     try:
         #lore = pick_lore()
         lore = None
-        posts = pick_n_posts(3, fools_content)
+        posts = pick_n_posts(2, fools_content)
         effects = pick_effects()
         tweet = try_mixture(posts, post_prev, lore, effects, log_event)
         log_event(f"Prepared tweet content: {tweet}")
-        print(f"Prepared tweet content:\n\n\t{tweet}\n")
+        #print(f"Prepared tweet content:\n\n\t{tweet}\n")
         return tweet
     except Exception as e:
         log_event(f"Error while preparing tweet content: {e}")
-        print(f"Error while preparing tweet content: {e}")
+        #print(f"Error while preparing tweet content: {e}")
         return None
 
 def tick():
@@ -223,19 +224,16 @@ def tick():
 
 def log_llm_configuration():
     """Log the current LLM configuration"""
-    provider = os.getenv("LLM_PROVIDER", "openai").lower()
-    
-    if provider == "openai":
-        model = os.getenv("LLM_MODEL", "unknown")
-        log_event(f"LLM Configuration - Provider: OpenAI, Model: {model}")
-        print(f"LLM Configuration - Provider: OpenAI, Model: {model}")
-    elif provider == "replicate":
-        model = os.getenv("REPLICATE_MODEL_VERSION", "unknown")
-        log_event(f"LLM Configuration - Provider: Replicate, Model: {model}")
-        print(f"LLM Configuration - Provider: Replicate, Model: {model}")
-    else:
-        log_event(f"LLM Configuration - Unknown provider: {provider}")
-        print(f"LLM Configuration - Unknown provider: {provider}")
+    try:
+        llm = LLMEngine.get_instance()
+        info = llm.get_provider_info()
+        message = f"LLM Configuration - Provider: {info['provider'].title()}, Model: {info['model']}"
+        log_event(message)
+        print(message)
+    except Exception as e:
+        message = f"Error getting LLM configuration: {str(e)}"
+        log_event(message)
+        print(message)
 
 if __name__ == "__main__":
     log_event("Starting agent...")
