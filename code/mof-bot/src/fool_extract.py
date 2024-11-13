@@ -131,4 +131,4 @@ def extract_content_from_fool(handle, max_tweets=1000):
 
 if __name__ == "__main__":
     handle = input("Enter the Twitter handle (without @): ")
-    extract_content_from_fool(handle, max_tweets=1000)
+    extract_content_from_fool(handle, max_tweets=5)
