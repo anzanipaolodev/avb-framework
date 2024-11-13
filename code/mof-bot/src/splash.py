@@ -38,7 +38,7 @@ def display(version="Wildcard (v0.0.0)"):
     logo_content = load_logo()
     combined_text = Text(logo_content, style=Style(color="green"))
     combined_text.append(f"\nVersion: {version}", style=Style(color="green"))
-    combined_text.append(f"\nAuthor:  @cottenio // scrypted", style=Style(color="green"))
+    combined_text.append(f"\nAuthor:  @MetaAnomaly", style=Style(color="green"))
 
     # Print the combined logo and version text directly (no panel)
     console.print(combined_text)
