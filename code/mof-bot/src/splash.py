@@ -7,7 +7,7 @@ from rich.text import Text
 from rich.style import Style
 
 # Default logo path
-default_logo_path = Path(__file__).parent.resolve() / "./assets/avbeing_logo.txt"
+default_logo_path = Path(__file__).parent.resolve() / "./assets/alternative_logo.txt"
 
 # Initialize a console object from rich
 console = Console()

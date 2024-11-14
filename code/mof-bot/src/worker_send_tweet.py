@@ -6,12 +6,13 @@ from dotenv import load_dotenv
 def load_env_variables():
     """Load environment variables from the .env file."""
     load_dotenv()
-    access_token = os.getenv("ACCESS_TOKEN_SENDER")
-    access_token_secret = os.getenv("ACCESS_TOKEN_SECRET_SENDER")
+    access_token = os.getenv("TWITTER_ACCESS_TOKEN")
+    access_token_secret = os.getenv("TWITTER_ACCESS_TOKEN_SECRET")
     consumer_key = os.getenv("TWITTER_API_KEY")
     consumer_secret = os.getenv("TWITTER_API_SECRET")
+    bearer_token = os.getenv("TWITTER_BEARER_TOKEN")
 
-    if not all([access_token, access_token_secret, consumer_key, consumer_secret]):
+    if not all([access_token, access_token_secret, consumer_key, consumer_secret, bearer_token]):
         raise ValueError("One or more required Twitter API credentials are missing.")
 
     return {
@@ -19,6 +20,7 @@ def load_env_variables():
         "access_token_secret": access_token_secret,
         "consumer_key": consumer_key,
         "consumer_secret": consumer_secret,
+        "bearer_token": bearer_token
     }
 
 def initialize_twitter_client():
@@ -36,7 +38,7 @@ def send_tweet(tweet, log_event=None):
     """Send a tweet using the Twitter API v2 with user authentication."""
     if log_event:
         log_event(f"Sending tweet: {tweet}")
-    print(f"Sending tweet: {tweet}")
+    #print(f"Sending tweet: {tweet}")
 
     client = initialize_twitter_client()
     try:
@@ -44,11 +46,11 @@ def send_tweet(tweet, log_event=None):
         if response.data and 'id' in response.data:
             if log_event:
                 log_event(f"Tweet successfully sent. Tweet ID: {response.data['id']}")
-            print(f"Tweet successfully sent. Tweet ID: {response.data['id']}")
+            #print(f"Tweet successfully sent. Tweet ID: {response.data['id']}")
         else:
             if log_event:
                 log_event("Tweet sent but response data is missing the Tweet ID.")
-            print("Tweet sent but response data is missing the Tweet ID.")
+            #print("Tweet sent but response data is missing the Tweet ID.")
     except TooManyRequests as e:
         if log_event:
             log_event(f"Rate limit error: {e}")
@@ -60,5 +62,5 @@ def send_tweet(tweet, log_event=None):
     except Exception as e:
         if log_event:
             log_event(f"Unexpected error: {e}")
-        print(f"Unexpected error: {e}")
+        #print(f"Unexpected error: {e}")
         raise  # Re-raise to allow the caller to handle it

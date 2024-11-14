@@ -57,7 +57,7 @@ def extract_content_from_fool(handle, max_tweets=1000):
             try:
                 response = client.get_users_tweets(
                     user_id,
-                    max_results=100,
+                    max_results=5,
                     pagination_token=pagination_token,
                     tweet_fields=['text', 'entities', 'public_metrics', 'created_at']
                 )
@@ -131,4 +131,4 @@ def extract_content_from_fool(handle, max_tweets=1000):
 
 if __name__ == "__main__":
     handle = input("Enter the Twitter handle (without @): ")
-    extract_content_from_fool(handle, max_tweets=5)
+    extract_content_from_fool(handle, max_tweets=1)

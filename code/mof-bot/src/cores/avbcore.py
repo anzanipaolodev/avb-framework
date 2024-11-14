@@ -96,10 +96,11 @@ class AVBCore(ABC):
         `_tick()` if the core is active, allowing each core to execute its unique logic.
         """
         if self.active:
-            print(f"{self.core_name} core is active; running {self.__class__.__name__}._tick.")
+            #print(f"{self.core_name} core is active; running {self.__class__.__name__}._tick.")
             self._tick()
         else:
-            print(f"{self.core_name} core is inactive; skipping {self.__class__.__name__}._tick.")
+            pass
+            #print(f"{self.core_name} core is inactive; skipping {self.__class__.__name__}._tick.")
 
     @abstractmethod
     def _tick(self):

@@ -53,14 +53,6 @@
             "DYOR",
             "To the moon"
         ],
-        "preferred_phrases": [
-            "As I've been saying...",
-            "Just like in 2008...",
-            "The bubble is obvious...",
-            "Gold, unlike $Schiff...",
-            "This ponzi scheme...",
-            "The fundamentals show..."
-        ],
         "tone_modifiers": {
             "base_fud_level": 0.7,
             "price_sensitivity": 1.2,

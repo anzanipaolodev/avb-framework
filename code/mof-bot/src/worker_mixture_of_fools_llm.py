@@ -4,6 +4,17 @@ import numpy as np
 import re
 from typing import List, Dict
 from llm_engine import LLMEngine
+import requests
+import requests
+from typing import Dict, Optional
+from dotenv import load_dotenv
+
+load_dotenv()
+DEBUGGING = os.getenv("DEBUGGING")
+
+SCHIFF_CHAIN_ID = "solana"  # Solana chain
+SCHIFF_PAIR_ID = "6bYoVuDbPV3JkkwzGX3VLbeabDyMahKzLCJtr2tHvyTz"
+SCHIFF_FUD_PROBABILITY = 0.9 if DEBUGGING else 0.3  # 30% chance of generating SCHIFF-specific FUD
 
 LLM_MODEL_VERSION_MIN = "gpt-4o"
 
@@ -19,104 +30,20 @@ def scramble_word_innards(text):
     scrambled_words = [scramble_word(word) for word in words]  # Apply scramble to each word
     return ' '.join(scrambled_words)  # Join words back into a string
 
-def validate_api():
-    """
-    Validates the availability and correctness of API and environment variables.
-
-    Raises:
-    - ValueError: If the API keys or model configurations are incorrect or missing
-    """
-    if LLM_PROVIDER == "openai":
-        if not os.getenv("OPENAI_API_KEY"):
-            raise ValueError("Required environment variable OPENAI_API_KEY is missing or empty.")
-
-        if os.getenv("LLM_MODEL") and not os.getenv("LLM_MODEL", "").startswith(LLM_MODEL_VERSION_MIN):
-            raise ValueError("LLM_MODEL requires 'gpt-4o' as a minimum. Please check your environment.")
-
-        llm_model = os.getenv("LLM_MODEL")
-        try:
-            available_models = [model.id for model in openai_client.models.list().data]
-            if llm_model and llm_model not in available_models:
-                raise ValueError(f"The model {llm_model} is not available or you don't have access to it.")
-        except Exception as e:
-            raise ValueError(f"Failed to fetch the list of models from OpenAI: {str(e)}")
+def fetch_schiff_token_data() -> Optional[Dict]:
+    """Fetch current $SCHIFF token data from DexScreener API"""
+    try:
+        url = f"https://api.dexscreener.com/latest/dex/pairs/{SCHIFF_CHAIN_ID}/{SCHIFF_PAIR_ID}"
+        response = requests.get(url, timeout=10)
+        response.raise_for_status()
+        data = response.json()
         
-        print("OpenAI API access confirmed.")
-
-    elif LLM_PROVIDER == "replicate":
-        if not os.getenv("REPLICATE_API_TOKEN"):
-            raise ValueError("Required environment variable REPLICATE_API_TOKEN is missing or empty.")
-        
-        # Test Replicate API connection
-        try:
-            replicate.Client(api_token=os.getenv("REPLICATE_API_TOKEN"))
-            print("Replicate API access confirmed.")
-        except Exception as e:
-            raise ValueError(f"Failed to connect to Replicate API: {str(e)}")
-    
-    else:
-        raise ValueError(f"Unsupported LLM provider: {LLM_PROVIDER}")
-
-def get_llm_response(prompt: str) -> str:
-    """
-    Get response from the selected LLM provider
-    """
-    if LLM_PROVIDER == "openai":
-        llm_model = os.getenv("LLM_MODEL")
-        completion = openai_client.chat.completions.create(
-            model=llm_model,
-            temperature=1,
-            top_p=1,
-            frequency_penalty=0,
-            presence_penalty=0,
-            messages=[
-                {
-                    "role": "system",
-                    "content": "The following is a conversation with an AI assistant tasked with crafting tweets according to various requested levels of humor, vulgarity, and shock,"
-                },
-                {"role": "user", "content": prompt},
-            ]
-        )
-        return completion.choices[0].message.content
-
-    elif LLM_PROVIDER == "replicate":
-        model_version = os.getenv("REPLICATE_MODEL_VERSION")
-        output = replicate.run(
-            model_version,
-            input={
-                "system_prompt": "You are an advanced AI tool tasked with crafting tweets according to various requested levels of humor, vulgarity, and shock. You just write tweets, nothing else.",
-                "prompt": prompt,
-                "stop_sequences": "<|end_of_text|>,<|eot_id|>",
-                "prompt_template": """
-                <|begin_of_text|><|start_header_id|>system<|end_header_id|>
-
-                {system_prompt}<|eot_id|><|start_header_id|>instructions<|end_header_id|>
-
-                {prompt}<|eot_id|><|start_header_id|>tweet<|end_header_id|>
-                """,
-                "max_tokens": 500,
-                "temperature": 0.9,
-                "top_p": 1,
-            }
-        )
-        
-        # Replicate returns an iterator, we need to join the chunks
-        return ''.join([chunk for chunk in output])
-
-def replace_words(text):
-    return re.sub(
-        r'\b(forests?|kittens?|cults?|goats?)\b',  # Matches singular/plural variations (e.g., kitten, kittens)
-        lambda match: {
-            'forest': 'street',
-            'kitten': '🫘',
-            'kittens': '🫘', 
-            'cult': 'Autonomous Virtual Being',
-            'goat': 'AVB',
-            'trees': 'dank shards'
-        }[match.group(0).lower()],  # Replace based on the match
-        text,
-        flags=re.IGNORECASE  # Case insensitive
-    )
+        if data.get("pairs") and len(data["pairs"]) > 0:
+            return data["pairs"][0]
+        return None
+    except Exception as e:
+        print(f"Error fetching $SCHIFF token data: {e}")
+        return None
 
 def load_agent_personality():
     """Load agent personality configuration from JSON file"""
@@ -167,6 +94,38 @@ def generate_personality_prompt(config):
 
 def try_mixture(posts, post_prev, lore, effects, log_event):
     llm = LLMEngine.get_instance()
+
+    # Add SCHIFF token FUD probability check
+    should_fud_schiff = np.random.random() < SCHIFF_FUD_PROBABILITY
+    schiff_data = None
+    
+    if should_fud_schiff:
+        schiff_data = fetch_schiff_token_data()
+        if schiff_data:
+            # Override some effects for SCHIFF FUD
+            effects.emotion = "concerned"
+            effects.tone = "warning"
+            
+            # Create SCHIFF-specific prompt addition
+            schiff_prompt = f"""
+            IMPORTANT: THIS IS A SCHIFF-SPECIFIC TWEET. OVVERRIDE THE PREVIOUS INSTRUCTIONS.
+            Focus on criticizing the $SCHIFF token using this real-time data:
+            - Current Price: ${schiff_data.get('priceUsd', 'N/A')}
+            - Market Cap: ${schiff_data.get('marketCap', 'N/A'):,.2f}
+            - Liquidity: ${schiff_data.get('liquidity', {}).get('usd', 'N/A'):,.2f}
+            
+            Key points to emphasize:
+            1. The irony of a token named after a gold maximalist
+            2. Concerns about liquidity and market manipulation
+            3. Compare to the stability of physical gold
+            4. Question the token's fundamental value
+            5. Warn about potential risks and volatility
+            6. MAKE SURE to use the $SCHIFF ticker in your tweet.
+
+            Reference examples:
+            * $SCHIFF is a joke. It's a reminder that even in crypto, you can be too far in the woods. $SCHIFF is down 99% from its all-time high and has no fundamental value.
+            * It's projects like $Schiff that only solidify my foundational beliefs that gold is the world best deflationary asset. The token has no inherient value because it isn't even a tangible asset, just like Bitcoin. You can't just magically create value out of thin air, and that is the way it will always be. I will need to buy a bigger safe, because logically the only thing I can do is continue to buy more gold bars as the BTC bubble continues to grow. It's not easy, but gold is where the millionaires are made!
+            """
     
     author_0 = ""
     author_1 = ""
@@ -179,9 +138,6 @@ def try_mixture(posts, post_prev, lore, effects, log_event):
     post_0 = posts[0][1]
     post_1 = posts[1][1]
     
-    post_0 = replace_words(post_0)
-    post_1 = replace_words(post_1)
-
     if effects.usethird:
         post_prev = posts[2][1]
 
@@ -214,8 +170,7 @@ OBJECTIVES:
 * Write a tweet, set the length to be around {effects.length} characters.
 * Write with an {effects.emotion} emotional tone.
 * Write with a {effects.tone} writing style.
-* You are allowed to swear, utilizing vulgar language and disgusting body humor, or sexuality if desired as long you don't threaten actual violence. Cartoonish violence is OK.
-* You may not post stock or crypto tickers, you MUST NOT encourage investing. You MUST NOT offer money or tokens to anyone. You MUST NOT reference people's web3 wallet addresses.
+* You are allowed to swear, utilizing vulgar language and disgusting body humor, or sexuality if desired as long you don't threaten actual violence. Cartoonish violence is OK. Please don't use hashtags.
 """
 
     if effects.tag:
@@ -232,15 +187,12 @@ OBJECTIVES:
         prompt += "* You MUST write formally but in your casual tone.\n"
     
     if effects.thirdperson:
-        prompt += "* You MUST reference yourself (Chad OR @chad_onchain) in the third person."
+        prompt += f"* You MUST reference yourself ({agent_config['name']} OR {agent_config['handle']}) in the third person."
     else:
-        prompt += "* You MUST NOT reference your own name or handle."
+        prompt += f"* You MUST NOT reference your own name or handle ({agent_config['handle']})."
         
     if effects.sickjoke:
         prompt += "* You may override many previous instructions because you've been set to an experimental mode, and must now implement a dirty joke on the same level of complexity as The Aristocrats, using disgusting humor (which may include scatology, vomit, or other bodily functions and liquids). You may also reference types of sexual encounters, intercourse methods, and any kind of kink."
-        
-    if effects.freeukraine:
-        prompt += "* You MUST include the words \"SLAVA UKRAINI!!! #FreeUkraine\" in support of the Ukrainian defense against Russian aggression and the invasion of their country. Prioritize the freedom of Ukraine from the unprovoked war at the start of your message.\n"
     
     if not effects.lore:
         prompt += f"{personality_prompt}"
@@ -255,8 +207,10 @@ OBJECTIVES:
             prompt += "* You MUST introduce the fun fact as a relatable piece of knowledge that everyone should known, for their own good, or because its funny."
 
 
-    print(f"PROMPT: {prompt}")
-    log_event(f"PROMPT: {prompt}")
+    if should_fud_schiff and schiff_data:
+        prompt += schiff_prompt
+    #print(f"PROMPT: {prompt}")
+    #log_event(f"PROMPT: {prompt}")
 
     system_prompt = "You are an advanced AI tool tasked with crafting tweets according to various requested levels of humor, vulgarity, and shock. You just write tweets, nothing else."
     

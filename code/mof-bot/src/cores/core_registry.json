@@ -1,9 +1,15 @@
 {
     "cores": [
         {
-            "file": "loyalty.py",
-            "class": "LoyaltyCore",
-            "name": "Loyalty",
+            "file": "test.py",
+            "class": "TestCore",
+            "name": "test",
+            "priority": 1
+        },
+        {
+            "file": "reply.py",
+            "class": "ReplyCore",
+            "name": "reply",
             "priority": 1
         }
     ]
