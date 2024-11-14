@@ -101,6 +101,9 @@ def try_mixture(posts, post_prev, lore, effects, log_event):
     
     if should_fud_schiff:
         schiff_data = fetch_schiff_token_data()
+        if schiff_data == None:
+            log_event("Error fetching $SCHIFF token data")
+
         if schiff_data:
             # Override some effects for SCHIFF FUD
             effects.emotion = "concerned"
