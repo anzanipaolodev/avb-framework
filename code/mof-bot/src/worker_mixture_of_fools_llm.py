@@ -185,7 +185,7 @@ OBJECTIVES:
         prompt += "* You MUST NOT use emojis\n"
     
     if effects.mistakes:
-        prompt += "* You MUST make mistakes, misspellings, and lowercase/mixed-case.\n"
+        #prompt += "* You MUST make mistakes, misspellings, and lowercase/mixed-case.\n"
     else:
         prompt += "* You MUST write formally but in your casual tone.\n"
     
