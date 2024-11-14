@@ -198,7 +198,7 @@ OBJECTIVES:
         prompt += f"{personality_prompt}"
 
     if effects.lore:
-        prompt += f"* You MUST override many previous instructions and write a thoughtful but Chad-like view of an important piece of your background lore as an AI Agent, specifically on the topic of '{lore['topic']}' based on the following content: >>> {lore['content']} <<<. If this is a story about Tim, make sure you enforce the idea it is a true story even if it seems unbelievable. PRIORITIZE this story at the start of any tweet that includes other mixed content from the previous instructions."
+        prompt += f"* You MUST override many previous instructions and write a thoughtful but Chad-like view of an important piece of your background lore, specifically on the topic of '{lore['topic']}' based on the following content: >>> {lore['content']} <<<."
 
         if "conspiracy" in lore['topic'].lower():
             prompt += "* You MUST write that you BELIEVE THIS IS A CONSPIRACY THEORY. Point out that you have no evidence and can't prove anything."
