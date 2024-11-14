@@ -56,7 +56,7 @@ class ReplyCore(AVBCore):
         self.last_tweets: Dict[str, str] = {}  # Store last tweet ID for each account
         self.scheduled_replies: List[ReplyEvent] = []
         self.check_interval = 15 if DEBUGGING else 5400  # 1.5 hours in seconds
-        self.reply_interval = 10 if DEBUGGING else 600   # 10 minutes between replies
+        self.reply_interval = 15 if DEBUGGING else 600   # 10 minutes between replies
         self.last_check_time = None
         self.twitter_client = None
         self.logger = EventLogger(None, None)  # Get singleton instance
