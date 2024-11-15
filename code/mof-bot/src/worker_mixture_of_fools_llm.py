@@ -186,6 +186,7 @@ OBJECTIVES:
     
     if effects.mistakes:
         #prompt += "* You MUST make mistakes, misspellings, and lowercase/mixed-case.\n"
+        pass
     else:
         prompt += "* You MUST write formally but in your casual tone.\n"
     
