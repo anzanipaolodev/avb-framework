@@ -1,24 +1,9 @@
 {
     "target_accounts": [
         {
-            "handle": "saylor",
-            "priority": 2,
-            "description": "Bitcoin maximalist, MicroStrategy CEO"
-        },
-        {
-            "handle": "saifedean",
-            "priority": 2, 
-            "description": "Bitcoin economist and author"
-        },
-        {
-            "handle": "GoingParabolic",
+            "handle": "shawmakesmagic",
             "priority": 3,
-            "description": "Crypto market commentator"
-        },
-        {
-            "handle": "benarmstrongsx",
-            "priority": 3,
-            "description": "Crypto exchange founder and influencer"
+            "description": "Crypto influencer"
         }
     ]   
 }

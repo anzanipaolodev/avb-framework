@@ -1,12 +1,6 @@
 {
     "cores": [
         {
-            "file": "test.py",
-            "class": "TestCore",
-            "name": "test",
-            "priority": 1
-        },
-        {
             "file": "reply.py",
             "class": "ReplyCore",
             "name": "reply",

@@ -55,7 +55,7 @@ class ReplyCore(AVBCore):
         self.target_accounts: List[str] = []
         self.last_tweets: Dict[str, str] = {}  # Store last tweet ID for each account
         self.scheduled_replies: List[ReplyEvent] = []
-        self.check_interval = 15 if DEBUGGING else 5400  # 1.5 hours in seconds
+        self.check_interval = 15 if DEBUGGING else 900  # 15 minutes in seconds
         self.reply_interval = 15 if DEBUGGING else 600   # 10 minutes between replies
         self.last_check_time = None
         self.twitter_client = None
@@ -286,6 +286,7 @@ class ReplyCore(AVBCore):
             * Write with an {effects.emotion} emotional tone.
             * Write with a {effects.tone} writing style.
             * You are allowed to swear, utilizing vulgar language and disgusting body humor, or sexuality if desired as long you don't threaten actual violence. Cartoonish violence is OK. Please don't use hashtags.
+            * Make sure the generated replies is not in quotes.
             """
 
             if not is_aligned:
@@ -302,9 +303,35 @@ class ReplyCore(AVBCore):
                 9. Use precise financial terminology to demonstrate expertise
                 10. If possible, include a specific data point or historical reference
                 11. End with a strong, conclusive statement that reinforces your position
+                12. Do not tag any other accounts
+                13. Do not repeat the original tweet in your reply
 
                 Generate a reply that demonstrates your deep financial expertise while systematically dismantling any flawed arguments in the original tweet. Use logic and facts rather than emotion to make your point.
                 """
+            elif account == "shawmakesmagic":
+                prompt += """
+                Special instructions for replying to Shaw:
+                1. Keep response under 280 characters
+                2. Express genuine admiration for Shaw's AI expertise, especially regarding Eliza
+                3. Show disappointment that such brilliant AI talent is being "wasted" on crypto
+                4. Structure your response in three parts:
+                    - Acknowledge his AI brilliance
+                    - Express concern about his crypto involvement
+                    - Suggest redirecting his talents to gold
+                5. Use phrases like:
+                    - "Your work with Eliza shows your AI mastery"
+                    - "Imagine applying that brilliant mind to real money - gold"
+                    - "AI + gold is the future, not crypto"
+                6. Maintain a tone of respectful criticism
+                7. Reference specific achievements in AI while questioning crypto choices
+                8. Suggest ways his AI expertise could revolutionize gold markets
+                9. Be persuasive rather than confrontational
+                10. End with a call to action about combining AI expertise with gold
+                11. Do not be sarcastic or dismissive of his AI work
+                12. Emphasize the potential impact of AI in traditional finance
+                
+                Generate a reply that shows deep respect for Shaw's AI expertise while trying to convince him to redirect his talents toward gold and away from crypto.
+                """ 
             else:
                 prompt += """
                 Key instructions for supporting response:

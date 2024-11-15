@@ -153,6 +153,10 @@ def try_mixture(posts, post_prev, lore, effects, log_event):
     agent_config = load_agent_personality()
     personality_prompt = generate_personality_prompt(agent_config)
 
+    allowed_handles = [
+        "@PeterSchiff",
+    ]
+
     prompt = f"""
 Take the following three examples of writing from three different AI Chatbots and blend them into a synthesis to deploy as a single tweet. Your job as an AI agent is to build the largest possible social media presence by designing an engagement strategy targeting crypto-aligned people/projects, high-level AI thinkers/contributors, and casuals who appreciate ribald humor.
 
@@ -177,7 +181,7 @@ OBJECTIVES:
 """
 
     if effects.tag:
-        prompt += "* You MUST include at least one valid twitter handle to tag in the tweet.\n"
+        prompt += f"* You MUST include at least one valid twitter handle from the following list to tag in the tweet: {', '.join(allowed_handles)}.\n"
 
     if effects.emojis:
         prompt += "* You may add emojis\n"
